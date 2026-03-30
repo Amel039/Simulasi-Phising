@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Simulasi Routing Jaringan (Edukasi)</title>
+
+<style>
+body {
+    font-family: Arial;
+    text-align: center;
+    background: #eef2f7;
+}
+
+h2 { margin-top: 15px; }
+
+canvas {
+    background: white;
+    border: 1px solid #ccc;
+    margin-top: 10px;
+}
+
+button {
+    padding: 8px 12px;
+    margin: 5px;
+    cursor: pointer;
+}
+
+.info {
+    margin-top: 10px;
+    font-weight: bold;
+}
+</style>
+</head>
+
+<body>
+
+<h2>🌐 Simulasi Routing Jaringan</h2>
+
+<button onclick="jalurMerah()">Jalur Merah</button>
+<button onclick="jalurHijau()">Jalur Hijau</button>
+<button onclick="jalurBiru()">Jalur Biru (Pembahasan)</button>
+<button onclick="semuaJalur()">Semua Jalur (Tabel)</button>
+<button onclick="reset()">Reset</button>
+
+<p>Klik node asal → tujuan untuk simulasi siswa</p>
+
+<canvas id="canvas" width="700" height="400"></canvas>
+
+<div class="info" id="info">Siap...</div>
+
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+// ================= NODE =================
+const nodes = {
+    A:{x:100,y:100},
+    B:{x:100,y:300},
+    R1:{x:250,y:200},
+    R2:{x:400,y:100},
+    R3:{x:400,y:200},
+    R4:{x:400,y:300},
+    C:{x:550,y:100},
+    D:{x:550,y:300}
+};
+
+// ================= EDGE =================
+const edges = [
+    ["A","R1"],["B","R1"],
+    ["R1","R2"],["R1","R3"],["R1","R4"],
+    ["R2","R3"],["R3","R4"],
+    ["R2","C"],["R4","D"]
+];
+
+let start = null;
+
+// ================= DRAW =================
+function drawBase(){
+    ctx.clearRect(0,0,700,400);
+
+    // garis
+    edges.forEach(e=>{
+        ctx.beginPath();
+        ctx.moveTo(nodes[e[0]].x,nodes[e[0]].y);
+        ctx.lineTo(nodes[e[1]].x,nodes[e[1]].y);
+        ctx.strokeStyle="#bbb";
+        ctx.lineWidth=1;
+        ctx.stroke();
+    });
+
+    // node
+    for(let n in nodes){
+        ctx.beginPath();
+        ctx.arc(nodes[n].x,nodes[n].y,15,0,Math.PI*2);
+        ctx.fillStyle="#3498db";
+        ctx.fill();
+
+        ctx.fillStyle="white";
+        ctx.fillText(n,nodes[n].x-5,nodes[n].y+5);
+    }
+}
+
+// gambar jalur
+function drawPath(path,color){
+    for(let i=0;i<path.length-1;i++){
+        let a = nodes[path[i]];
+        let b = nodes[path[i+1]];
+
+        ctx.beginPath();
+        ctx.moveTo(a.x,a.y);
+        ctx.lineTo(b.x,b.y);
+        ctx.strokeStyle=color;
+        ctx.lineWidth=4;
+        ctx.stroke();
+    }
+}
+
+// ================= JALUR TABEL =================
+const pathMerah = ["B","R1","R2","R3","R4","D"];
+const pathHijau = ["B","R1","R3","R4","D"];
+const pathBiru  = ["B","R1","R4","D"];
+
+// ================= BUTTON =================
+function jalurMerah(){
+    drawBase();
+    drawPath(pathMerah,"red");
+    info("Jalur MERAH (5 langkah)");
+}
+
+function jalurHijau(){
+    drawBase();
+    drawPath(pathHijau,"green");
+    info("Jalur HIJAU (4 langkah)");
+}
+
+function jalurBiru(){
+    drawBase();
+    drawPath(pathBiru,"blue");
+    info("Jalur TERBAIK (pembahasan guru)");
+}
+
+function semuaJalur(){
+    drawBase();
+    drawPath(pathMerah,"red");
+    drawPath(pathHijau,"green");
+    drawPath(pathBiru,"blue");
+    info("Semua jalur (sesuai tabel)");
+}
+
+// ================= DFS =================
+function findAllPaths(start,end,path=[],visited=new Set()){
+    path.push(start);
+    visited.add(start);
+
+    if(start===end) return [path];
+
+    let paths=[];
+
+    edges.forEach(e=>{
+        if(e.includes(start)){
+            let next = e[0]===start?e[1]:e[0];
+            if(!visited.has(next)){
+                paths = paths.concat(
+                    findAllPaths(next,end,[...path],new Set(visited))
+                );
+            }
+        }
+    });
+
+    return paths;
+}
+
+// ================= CLICK (NO BEST PATH) =================
+canvas.addEventListener("click",function(e){
+    let rect=canvas.getBoundingClientRect();
+    let x=e.clientX-rect.left;
+    let y=e.clientY-rect.top;
+
+    for(let n in nodes){
+        let dx=x-nodes[n].x;
+        let dy=y-nodes[n].y;
+
+        if(Math.sqrt(dx*dx+dy*dy)<15){
+            if(!start){
+                start=n;
+                info("Asal: "+n);
+            } else {
+                let end=n;
+
+                let paths = findAllPaths(start,end);
+
+                if(paths.length>0){
+
+                    drawBase();
+
+                    // 🔥 semua jalur netral
+                    paths.forEach((p,i)=>{
+                        drawPath(p,"#444");
+
+                        // label jalur
+                        let mid = nodes[p[Math.floor(p.length/2)]];
+                        ctx.fillStyle="black";
+                        ctx.fillText("J"+(i+1), mid.x+5, mid.y-5);
+                    });
+
+                    info("Ditemukan "+paths.length+" jalur (tentukan sendiri yang terbaik)");
+                }
+
+                start=null;
+            }
+        }
+    }
+});
+
+// ================= UTIL =================
+function reset(){
+    drawBase();
+    info("Reset");
+}
+
+function info(text){
+    document.getElementById("info").innerText=text;
+}
+
+// INIT
+drawBase();
+</script>
+
+</body>
+</html>
